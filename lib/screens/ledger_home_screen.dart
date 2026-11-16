@@ -7,6 +7,7 @@ import '../services/ledger_service.dart';
 import '../services/ledger_storage_service.dart';
 import 'accounts_screen.dart';
 import 'add_journal_transaction_screen.dart';
+import 'transactions_screen.dart';
 
 class LedgerHomeScreen extends StatefulWidget {
   const LedgerHomeScreen({super.key});
@@ -122,6 +123,22 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => const AccountsScreen(),
+      ),
+    );
+
+    await _loadData();
+  }
+
+  Future<void> _openTransactions() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransactionsScreen(
+          accounts: _accounts,
+          transactions: _transactions,
+          onEdit: _openTransactionForm,
+          onDelete: _deleteTransaction,
+        ),
       ),
     );
 
@@ -362,7 +379,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       _formatAmount(amount),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -459,7 +476,9 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
               ? green.withValues(alpha: 0.16)
               : Colors.redAccent.withValues(alpha: 0.14),
           child: Icon(
-            receipt ? Icons.shopping_cart_outlined : Icons.receipt_long,
+            receipt
+                ? Icons.shopping_cart_outlined
+                : Icons.receipt_long,
             color: receipt ? green : Colors.redAccent,
             size: 23,
           ),
@@ -658,13 +677,12 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   Row(
                     children: [
                       _buildShortcut(
                         icon: Icons.receipt_long_outlined,
                         title: 'Transactions',
-                        onTap: () => _showComingSoon('Transactions'),
+                        onTap: _openTransactions,
                       ),
                       const SizedBox(width: 9),
                       _buildShortcut(
@@ -686,9 +704,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 26),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -701,7 +717,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () => _showComingSoon('All Transactions'),
+                        onPressed: _openTransactions,
                         child: const Text(
                           'View All  ›',
                           style: TextStyle(
@@ -712,9 +728,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 5),
-
                   if (recentTransactions.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(25),
