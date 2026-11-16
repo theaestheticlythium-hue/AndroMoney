@@ -386,7 +386,7 @@ class ReportsScreen extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
-                    value: percentage.clamp(0.0, 1.0),
+                    value: percentage.clamp(0.0, 1.0).toDouble(),
                     minHeight: 7,
                     backgroundColor: Colors.white10,
                     valueColor: const AlwaysStoppedAnimation(accentColor),

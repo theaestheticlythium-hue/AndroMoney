@@ -8,6 +8,7 @@ import '../services/ledger_storage_service.dart';
 import 'accounts_screen.dart';
 import 'add_journal_transaction_screen.dart';
 import 'reports_screen.dart';
+import 'settings_screen.dart';
 import 'transactions_screen.dart';
 
 class LedgerHomeScreen extends StatefulWidget {
@@ -163,6 +164,15 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     );
 
     await _loadData();
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SettingsScreen(),
+      ),
+    );
   }
 
   Future<void> _deleteTransaction(
@@ -724,7 +734,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                       _buildShortcut(
                         icon: Icons.settings_outlined,
                         title: 'Settings',
-                        onTap: () => _showComingSoon('Settings'),
+                        onTap: _openSettings,
                       ),
                     ],
                   ),
