@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+
+import 'screens/ledger_home_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,22 +14,23 @@ class AndroMoneyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'AndroMoney',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF176B5B),
+          seedColor: Colors.green,
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF5F7F6),
         appBarTheme: const AppBarTheme(
           centerTitle: false,
-          elevation: 0,
+        ),
+        cardTheme: const CardThemeData(
+          elevation: 1,
+          margin: EdgeInsets.symmetric(vertical: 6),
         ),
       ),
-      home: const HomeScreen(),
+      home: const LedgerHomeScreen(),
     );
   }
 }
-
