@@ -42,21 +42,23 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     });
   }
 
-  Future<void> _addTransaction() async {
-    final transaction = await Navigator.push<JournalTransaction>(
+  Future<void> _openTransactionForm({
+    JournalTransaction? transactionToEdit,
+  }) async {
+    final result = await Navigator.push<JournalTransaction>(
       context,
       MaterialPageRoute(
         builder: (_) => AddJournalTransactionScreen(
           accounts: _accounts,
+          transactionToEdit: transactionToEdit,
         ),
       ),
     );
 
-    if (transaction == null) return;
+    if (result == null) return;
 
-    if (!_ledgerService.validateTransaction(transaction)) {
+    if (!_ledgerService.validateTransaction(result)) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Invalid or unbalanced transaction'),
@@ -65,10 +67,74 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
       return;
     }
 
-    final updatedTransactions = [
-      ..._transactions,
-      transaction,
-    ];
+    final updatedTransactions = [..._transactions];
+    final existingIndex = updatedTransactions.indexWhere(
+      (item) => item.id == result.id,
+    );
+
+    if (existingIndex >= 0) {
+      updatedTransactions[existingIndex] = result;
+    } else {
+      updatedTransactions.add(result);
+    }
+
+    await _storage.saveTransactions(updatedTransactions);
+
+    if (!mounted) return;
+
+    setState(() {
+      _transactions = updatedTransactions;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          existingIndex >= 0
+              ? 'Transaction updated successfully'
+              : 'Transaction saved successfully',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteTransaction(
+    JournalTransaction transaction,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Transaction?'),
+          content: Text(
+            'Are you sure you want to delete '
+            '"${transaction.title}"?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    final updatedTransactions = _transactions
+        .where((item) => item.id != transaction.id)
+        .toList();
 
     await _storage.saveTransactions(updatedTransactions);
 
@@ -80,8 +146,97 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Transaction saved successfully'),
+        content: Text('Transaction deleted successfully'),
       ),
+    );
+  }
+
+  Future<void> _openTransactionDetails(
+    JournalTransaction transaction,
+  ) async {
+    final debitEntries = transaction.entries
+        .where((entry) => entry.side.name == 'debit')
+        .toList();
+
+    final creditEntries = transaction.entries
+        .where((entry) => entry.side.name == 'credit')
+        .toList();
+
+    String accountName(String accountId) {
+      final account = _accounts.where(
+        (item) => item.id == accountId,
+      );
+
+      return account.isEmpty ? 'Unknown Account' : account.first.name;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(transaction.title),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Voucher: ${transaction.voucherNumber}'),
+                Text(
+                  'Date: ${transaction.date.day}/'
+                  '${transaction.date.month}/'
+                  '${transaction.date.year}',
+                ),
+                const Divider(),
+                const Text(
+                  'Debit Entries',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                ...debitEntries.map(
+                  (entry) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(accountName(entry.accountId)),
+                    trailing: Text(
+                      '₹${entry.amount.toStringAsFixed(2)}',
+                    ),
+                  ),
+                ),
+                const Text(
+                  'Credit Entries',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                ...creditEntries.map(
+                  (entry) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(accountName(entry.accountId)),
+                    trailing: Text(
+                      '₹${entry.amount.toStringAsFixed(2)}',
+                    ),
+                  ),
+                ),
+                if (transaction.referenceNumber != null)
+                  Text('Reference: ${transaction.referenceNumber}'),
+                if (transaction.notes != null)
+                  Text('Notes: ${transaction.notes}'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _openTransactionForm(
+                  transactionToEdit: transaction,
+                );
+              },
+              child: const Text('Edit'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -101,7 +256,8 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         .where((account) => account.type == AccountType.asset)
         .fold(
           0.0,
-          (sum, account) => sum +
+          (sum, account) =>
+              sum +
               _ledgerService.getAccountBalance(
                 account: account,
                 transactions: _transactions,
@@ -114,7 +270,8 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         .where((account) => account.type == AccountType.liability)
         .fold(
           0.0,
-          (sum, account) => sum +
+          (sum, account) =>
+              sum +
               _ledgerService.getAccountBalance(
                 account: account,
                 transactions: _transactions,
@@ -136,9 +293,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            CircleAvatar(
-              child: Icon(icon),
-            ),
+            CircleAvatar(child: Icon(icon)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -146,9 +301,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                    ),
+                    style: const TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 5),
                   Text(
@@ -167,22 +320,74 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     );
   }
 
-  Widget _buildTransactionTile(JournalTransaction transaction) {
-    return ListTile(
-      leading: const CircleAvatar(
-        child: Icon(Icons.receipt_long),
-      ),
-      title: Text(transaction.title),
-      subtitle: Text(
-        '${transaction.voucherNumber} • '
-        '${transaction.date.day}/'
-        '${transaction.date.month}/'
-        '${transaction.date.year}',
-      ),
-      trailing: Text(
-        _formatAmount(transaction.totalDebit),
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
+  Widget _buildTransactionTile(
+    JournalTransaction transaction,
+  ) {
+    return Card(
+      child: ListTile(
+        onTap: () => _openTransactionDetails(transaction),
+        leading: const CircleAvatar(
+          child: Icon(Icons.receipt_long),
+        ),
+        title: Text(transaction.title),
+        subtitle: Text(
+          '${transaction.voucherNumber} • '
+          '${transaction.date.day}/'
+          '${transaction.date.month}/'
+          '${transaction.date.year}',
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _formatAmount(transaction.totalDebit),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'view') {
+                  _openTransactionDetails(transaction);
+                } else if (value == 'edit') {
+                  _openTransactionForm(
+                    transactionToEdit: transaction,
+                  );
+                } else if (value == 'delete') {
+                  _deleteTransaction(transaction);
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'view',
+                  child: ListTile(
+                    leading: Icon(Icons.visibility_outlined),
+                    title: Text('View'),
+                    dense: true,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Edit'),
+                    dense: true,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.delete_outline,
+                      color: Colors.red,
+                    ),
+                    title: Text('Delete'),
+                    dense: true,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -200,19 +405,19 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
           IconButton(
             onPressed: _openAccounts,
             icon: const Icon(Icons.account_balance_wallet),
-            tooltip: 'Accounts',
+            tooltip: 'Manage Accounts',
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isLoading ? null : _addTransaction,
+        onPressed: _isLoading
+            ? null
+            : () => _openTransactionForm(),
         icon: const Icon(Icons.add),
         label: const Text('Transaction'),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadData,
               child: ListView(
@@ -263,7 +468,8 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                         padding: EdgeInsets.all(24),
                         child: Center(
                           child: Text(
-                            'No transactions yet.\nTap + Transaction to add one.',
+                            'No transactions yet.\n'
+                            'Tap + Transaction to add one.',
                             textAlign: TextAlign.center,
                           ),
                         ),
