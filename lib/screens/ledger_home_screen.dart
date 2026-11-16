@@ -59,6 +59,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
 
     if (!_ledgerService.validateTransaction(result)) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Invalid or unbalanced transaction'),
@@ -68,6 +69,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     }
 
     final updatedTransactions = [..._transactions];
+
     final existingIndex = updatedTransactions.indexWhere(
       (item) => item.id == result.id,
     );
@@ -167,7 +169,9 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         (item) => item.id == accountId,
       );
 
-      return account.isEmpty ? 'Unknown Account' : account.first.name;
+      return account.isEmpty
+          ? 'Unknown Account'
+          : account.first.name;
     }
 
     await showDialog<void>(
@@ -293,7 +297,9 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            CircleAvatar(child: Icon(icon)),
+            CircleAvatar(
+              child: Icon(icon),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -323,15 +329,41 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
   Widget _buildTransactionTile(
     JournalTransaction transaction,
   ) {
+    final debitEntries = transaction.entries
+        .where((entry) => entry.side.name == 'debit')
+        .toList();
+
+    final creditEntries = transaction.entries
+        .where((entry) => entry.side.name == 'credit')
+        .toList();
+
+    final isReceipt = debitEntries.any((entry) {
+      return _accounts.any(
+        (account) =>
+            account.id == entry.accountId &&
+            account.type == AccountType.asset,
+      );
+    });
+
+    final entryType = isReceipt ? 'Receipt' : 'Payment';
+
     return Card(
       child: ListTile(
         onTap: () => _openTransactionDetails(transaction),
-        leading: const CircleAvatar(
-          child: Icon(Icons.receipt_long),
+        leading: CircleAvatar(
+          backgroundColor: isReceipt
+              ? const Color(0xFF00E676).withValues(alpha: 0.15)
+              : Colors.red.withValues(alpha: 0.15),
+          child: Icon(
+            isReceipt ? Icons.south_west : Icons.north_east,
+            color: isReceipt
+                ? const Color(0xFF00E676)
+                : Colors.redAccent,
+          ),
         ),
         title: Text(transaction.title),
         subtitle: Text(
-          '${transaction.voucherNumber} • '
+          '$entryType • ${transaction.voucherNumber} • '
           '${transaction.date.day}/'
           '${transaction.date.month}/'
           '${transaction.date.year}',
@@ -414,7 +446,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
             ? null
             : () => _openTransactionForm(),
         icon: const Icon(Icons.add),
-        label: const Text('Transaction'),
+        label: const Text('New Entry'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -469,7 +501,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                         child: Center(
                           child: Text(
                             'No transactions yet.\n'
-                            'Tap + Transaction to add one.',
+                            'Tap + New Entry to add one.',
                             textAlign: TextAlign.center,
                           ),
                         ),
