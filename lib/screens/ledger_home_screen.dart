@@ -23,6 +23,12 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
   List<JournalTransaction> _transactions = [];
   bool _isLoading = true;
 
+  static const Color background = Color(0xFF080D12);
+  static const Color surface = Color(0xFF111B22);
+  static const Color green = Color(0xFF00E676);
+  static const Color muted = Color(0xFF9AA7B0);
+  static const Color border = Color(0xFF263640);
+
   @override
   void initState() {
     super.initState();
@@ -30,16 +36,28 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
   }
 
   Future<void> _loadData() async {
-    final accounts = await _storage.initializeDefaultAccounts();
-    final transactions = await _storage.loadTransactions();
+    try {
+      final accounts = await _storage.initializeDefaultAccounts();
+      final transactions = await _storage.loadTransactions();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _accounts = accounts;
-      _transactions = transactions;
-      _isLoading = false;
-    });
+      setState(() {
+        _accounts = accounts;
+        _transactions = transactions;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to load data: $error')),
+      );
+    }
   }
 
   Future<void> _openTransactionForm({
@@ -99,6 +117,17 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     );
   }
 
+  Future<void> _openAccounts() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AccountsScreen(),
+      ),
+    );
+
+    await _loadData();
+  }
+
   Future<void> _deleteTransaction(
     JournalTransaction transaction,
   ) async {
@@ -106,6 +135,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
+          backgroundColor: surface,
           title: const Text('Delete Transaction?'),
           content: Text(
             'Are you sure you want to delete '
@@ -113,18 +143,14 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, false);
-              },
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, true);
-              },
+              onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text(
                 'Delete',
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: Colors.redAccent),
               ),
             ),
           ],
@@ -165,19 +191,18 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         .toList();
 
     String accountName(String accountId) {
-      final account = _accounts.where(
-        (item) => item.id == accountId,
+      final matches = _accounts.where(
+        (account) => account.id == accountId,
       );
 
-      return account.isEmpty
-          ? 'Unknown Account'
-          : account.first.name;
+      return matches.isEmpty ? 'Unknown Account' : matches.first.name;
     }
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
+          backgroundColor: surface,
           title: Text(transaction.title),
           content: SingleChildScrollView(
             child: Column(
@@ -204,6 +229,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
                 const Text(
                   'Credit Entries',
                   style: TextStyle(fontWeight: FontWeight.bold),
@@ -244,20 +270,13 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     );
   }
 
-  Future<void> _openAccounts() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const AccountsScreen(),
-      ),
-    );
-
-    await _loadData();
-  }
-
   double _totalAssets() {
     return _accounts
-        .where((account) => account.type == AccountType.asset)
+        .where(
+          (account) =>
+              account.type == AccountType.asset &&
+              !account.isArchived,
+        )
         .fold(
           0.0,
           (sum, account) =>
@@ -271,7 +290,11 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
 
   double _totalLiabilities() {
     return _accounts
-        .where((account) => account.type == AccountType.liability)
+        .where(
+          (account) =>
+              account.type == AccountType.liability &&
+              !account.isArchived,
+        )
         .fold(
           0.0,
           (sum, account) =>
@@ -287,34 +310,63 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     return '₹${amount.toStringAsFixed(2)}';
   }
 
-  Widget _buildSummaryCard(
-    String title,
-    double amount,
-    IconData icon,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature screen will be added next'),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard({
+    required String title,
+    required double amount,
+    required IconData icon,
+    required Color accent,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: accent.withValues(alpha: 0.45),
+          ),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              accent.withValues(alpha: 0.19),
+              surface,
+            ],
+          ),
+        ),
         child: Row(
           children: [
-            CircleAvatar(
-              child: Icon(icon),
-            ),
-            const SizedBox(width: 12),
+            Icon(icon, color: accent, size: 29),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    _formatAmount(amount),
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _formatAmount(amount),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -326,47 +378,112 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     );
   }
 
-  Widget _buildTransactionTile(
-    JournalTransaction transaction,
-  ) {
-    final debitEntries = transaction.entries
-        .where((entry) => entry.side.name == 'debit')
-        .toList();
+  Widget _buildShortcut({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color color = green,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
+          height: 94,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 5,
+            vertical: 13,
+          ),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: border),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 29),
+              const SizedBox(height: 9),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    final creditEntries = transaction.entries
-        .where((entry) => entry.side.name == 'credit')
-        .toList();
+  bool _isReceipt(JournalTransaction transaction) {
+    final debitEntries = transaction.entries.where(
+      (entry) => entry.side.name == 'debit',
+    );
 
-    final isReceipt = debitEntries.any((entry) {
+    return debitEntries.any((entry) {
       return _accounts.any(
         (account) =>
             account.id == entry.accountId &&
             account.type == AccountType.asset,
       );
     });
+  }
 
-    final entryType = isReceipt ? 'Receipt' : 'Payment';
+  Widget _buildTransactionTile(
+    JournalTransaction transaction,
+  ) {
+    final receipt = _isReceipt(transaction);
 
-    return Card(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
       child: ListTile(
         onTap: () => _openTransactionDetails(transaction),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 11,
+          vertical: 3,
+        ),
         leading: CircleAvatar(
-          backgroundColor: isReceipt
-              ? const Color(0xFF00E676).withValues(alpha: 0.15)
-              : Colors.red.withValues(alpha: 0.15),
+          radius: 22,
+          backgroundColor: receipt
+              ? green.withValues(alpha: 0.16)
+              : Colors.redAccent.withValues(alpha: 0.14),
           child: Icon(
-            isReceipt ? Icons.south_west : Icons.north_east,
-            color: isReceipt
-                ? const Color(0xFF00E676)
-                : Colors.redAccent,
+            receipt ? Icons.shopping_cart_outlined : Icons.receipt_long,
+            color: receipt ? green : Colors.redAccent,
+            size: 23,
           ),
         ),
-        title: Text(transaction.title),
+        title: Text(
+          transaction.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
         subtitle: Text(
-          '$entryType • ${transaction.voucherNumber} • '
-          '${transaction.date.day}/'
-          '${transaction.date.month}/'
-          '${transaction.date.year}',
+          '${transaction.date.day} '
+          '${_monthName(transaction.date.month)} '
+          '${transaction.date.year} • ${transaction.voucherNumber}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: muted,
+            fontSize: 10,
+          ),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -374,10 +491,17 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
             Text(
               _formatAmount(transaction.totalDebit),
               style: const TextStyle(
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: 12,
               ),
             ),
             PopupMenuButton<String>(
+              icon: const Icon(
+                Icons.more_vert,
+                color: Colors.white70,
+              ),
+              color: surface,
               onSelected: (value) {
                 if (value == 'view') {
                   _openTransactionDetails(transaction);
@@ -392,29 +516,17 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
               itemBuilder: (context) => const [
                 PopupMenuItem(
                   value: 'view',
-                  child: ListTile(
-                    leading: Icon(Icons.visibility_outlined),
-                    title: Text('View'),
-                    dense: true,
-                  ),
+                  child: Text('View'),
                 ),
                 PopupMenuItem(
                   value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit'),
-                    dense: true,
-                  ),
+                  child: Text('Edit'),
                 ),
                 PopupMenuItem(
                   value: 'delete',
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.delete_outline,
-                      color: Colors.red,
-                    ),
-                    title: Text('Delete'),
-                    dense: true,
+                  child: Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.redAccent),
                   ),
                 ),
               ],
@@ -425,86 +537,214 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     );
   }
 
+  String _monthName(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return months[month - 1];
+  }
+
   @override
   Widget build(BuildContext context) {
     final recentTransactions = [..._transactions]
       ..sort((a, b) => b.date.compareTo(a.date));
 
     return Scaffold(
+      backgroundColor: background,
       appBar: AppBar(
-        title: const Text('AndroMoney'),
+        backgroundColor: background,
+        titleSpacing: 12,
+        title: Row(
+          children: [
+            Container(
+              width: 39,
+              height: 39,
+              decoration: BoxDecoration(
+                color: green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(
+                  color: green.withValues(alpha: 0.6),
+                ),
+              ),
+              child: const Icon(
+                Icons.account_balance_wallet_outlined,
+                color: green,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: 'Andro',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      TextSpan(
+                        text: 'Money',
+                        style: TextStyle(color: green),
+                      ),
+                    ],
+                  ),
+                ),
+                const Text(
+                  'Double-Entry Accounting',
+                  style: TextStyle(
+                    color: muted,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
         actions: [
           IconButton(
-            onPressed: _openAccounts,
-            icon: const Icon(Icons.account_balance_wallet),
-            tooltip: 'Manage Accounts',
+            onPressed: () => _showComingSoon('Notifications'),
+            icon: const Icon(
+              Icons.notifications_none,
+              color: Colors.white,
+            ),
           ),
+          const SizedBox(width: 5),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isLoading
             ? null
             : () => _openTransactionForm(),
+        backgroundColor: green,
+        foregroundColor: Colors.black,
         icon: const Icon(Icons.add),
-        label: const Text('New Entry'),
+        label: const Text(
+          'Transaction',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: green),
+            )
           : RefreshIndicator(
+              color: green,
+              backgroundColor: surface,
               onRefresh: _loadData,
               child: ListView(
-                padding: const EdgeInsets.only(
-                  left: 12,
-                  right: 12,
-                  top: 12,
-                  bottom: 90,
-                ),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
                 children: [
-                  _buildSummaryCard(
-                    'Total Assets',
-                    _totalAssets(),
-                    Icons.account_balance,
-                  ),
-                  _buildSummaryCard(
-                    'Total Liabilities',
-                    _totalLiabilities(),
-                    Icons.credit_card,
+                  Row(
+                    children: [
+                      _buildSummaryCard(
+                        title: 'Total Assets',
+                        amount: _totalAssets(),
+                        icon: Icons.account_balance_wallet_outlined,
+                        accent: green,
+                      ),
+                      const SizedBox(width: 10),
+                      _buildSummaryCard(
+                        title: 'Total Liabilities',
+                        amount: _totalLiabilities(),
+                        icon: Icons.credit_card_outlined,
+                        accent: const Color(0xFFFF647C),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.wallet),
-                      title: const Text('Manage Accounts'),
-                      subtitle: Text(
-                        '${_accounts.where((a) => !a.isArchived).length} accounts',
+
+                  Row(
+                    children: [
+                      _buildShortcut(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Transactions',
+                        onTap: () => _showComingSoon('Transactions'),
                       ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: _openAccounts,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      'Recent Transactions',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 9),
+                      _buildShortcut(
+                        icon: Icons.account_balance_outlined,
+                        title: 'Manage Accounts',
+                        onTap: _openAccounts,
                       ),
-                    ),
+                      const SizedBox(width: 9),
+                      _buildShortcut(
+                        icon: Icons.bar_chart_rounded,
+                        title: 'Reports',
+                        onTap: () => _showComingSoon('Reports'),
+                      ),
+                      const SizedBox(width: 9),
+                      _buildShortcut(
+                        icon: Icons.settings_outlined,
+                        title: 'Settings',
+                        onTap: () => _showComingSoon('Settings'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  if (recentTransactions.isEmpty)
-                    const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(
-                          child: Text(
-                            'No transactions yet.\n'
-                            'Tap + New Entry to add one.',
-                            textAlign: TextAlign.center,
+
+                  const SizedBox(height: 26),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Recent Transactions',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _showComingSoon('All Transactions'),
+                        child: const Text(
+                          'View All  ›',
+                          style: TextStyle(
+                            color: green,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  if (recentTransactions.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(25),
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: border),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            color: muted,
+                            size: 35,
+                          ),
+                          SizedBox(height: 10),
+                          Text(
+                            'No transactions yet',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          SizedBox(height: 5),
+                          Text(
+                            'Tap + Transaction to add your first entry.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   else
