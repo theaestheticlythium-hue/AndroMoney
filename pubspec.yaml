@@ -21,6 +21,30 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/andromoney_app_icon.png
+    - assets/images/andromoney_logo.png
+    - assets/images/andromoney_splash_bg.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/andromoney_app_icon.png"
+  adaptive_icon_background: "#080D12"
+  adaptive_icon_foreground: "assets/images/andromoney_app_icon.png"
+
+flutter_native_splash:
+  color: "#080D12"
+  background_image: "assets/images/andromoney_splash_bg.png"
+  android: true
+  ios: false
+  android_12:
+    color: "#080D12"
+    image: "assets/images/andromoney_app_icon.png"
+    icon_background_color: "#080D12"
