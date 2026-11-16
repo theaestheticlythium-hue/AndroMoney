@@ -22,6 +22,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
 
   List<LedgerAccount> _accounts = [];
   List<JournalTransaction> _transactions = [];
+
   bool _isLoading = true;
 
   static const Color background = Color(0xFF080D12);
@@ -129,6 +130,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     await _loadData();
   }
 
+  // Corrected callback connection for TransactionsScreen.
   Future<void> _openTransactions() async {
     await Navigator.push(
       context,
@@ -136,7 +138,11 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         builder: (_) => TransactionsScreen(
           accounts: _accounts,
           transactions: _transactions,
-          onEdit: _openTransactionForm,
+          onEdit: (transaction) {
+            return _openTransactionForm(
+              transactionToEdit: transaction,
+            );
+          },
           onDelete: _deleteTransaction,
         ),
       ),
@@ -212,7 +218,9 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         (account) => account.id == accountId,
       );
 
-      return matches.isEmpty ? 'Unknown Account' : matches.first.name;
+      return matches.isEmpty
+          ? 'Unknown Account'
+          : matches.first.name;
     }
 
     await showDialog<void>(
@@ -657,7 +665,9 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
               backgroundColor: surface,
               onRefresh: _loadData,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
+                padding: const EdgeInsets.fromLTRB(
+                  14, 12, 14, 100,
+                ),
                 children: [
                   Row(
                     children: [
