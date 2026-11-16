@@ -6,6 +6,7 @@ import '../models/ledger_entry.dart';
 import '../models/journal_transaction.dart';
 import '../services/ledger_service.dart';
 import '../services/ledger_storage_service.dart';
+import 'account_details_screen.dart';
 
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
@@ -176,7 +177,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
                         labelText: 'Account Name',
-                        prefixIcon: Icon(Icons.account_balance_wallet),
+                        prefixIcon: Icon(
+                          Icons.account_balance_wallet,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -246,7 +249,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                     final now = DateTime.now();
 
                     final newAccount = isEditing
-                        ? accountToEdit.copyWith(
+                        ? accountToEdit!.copyWith(
                             name: name,
                             type: selectedType,
                             openingBalance: openingBalance,
@@ -372,370 +375,17 @@ class _AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
-  void _viewAccount(LedgerAccount account) {
-    final entries = _ledgerService.getAccountEntries(
-      accountId: account.id,
-      transactions: _transactions,
-    );
-
-    final debitTotal = entries
-        .where((entry) => entry.side == EntrySide.debit)
-        .fold(0.0, (sum, entry) => sum + entry.amount);
-
-    final creditTotal = entries
-        .where((entry) => entry.side == EntrySide.credit)
-        .fold(0.0, (sum, entry) => sum + entry.amount);
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return DefaultTabController(
-          length: 2,
-          child: Dialog(
-            backgroundColor: background,
-            insetPadding: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: border),
-            ),
-            child: SizedBox(
-              width: double.maxFinite,
-              height: MediaQuery.of(context).size.height * 0.72,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 18, 12, 12),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: _accountColor(account.type)
-                              .withValues(alpha: 0.15),
-                          child: Icon(
-                            _accountIcon(account.type),
-                            color: _accountColor(account.type),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                account.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '${_typeName(account.type)} Account',
-                                style: const TextStyle(
-                                  color: muted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          icon: const Icon(
-                            Icons.close,
-                            color: muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                        color: green.withValues(alpha: 0.3),
-                      ),
-                      gradient: LinearGradient(
-                        colors: [
-                          green.withValues(alpha: 0.15),
-                          surface,
-                        ],
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Current Balance',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          _formatAmount(_balance(account)),
-                          style: const TextStyle(
-                            color: green,
-                            fontSize: 25,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        _detailAmount(
-                          'Opening Balance',
-                          _formatAmount(account.openingBalance),
-                        ),
-                        _detailAmount(
-                          'Total Debit',
-                          _formatAmount(debitTotal),
-                        ),
-                        _detailAmount(
-                          'Total Credit',
-                          _formatAmount(creditTotal),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const TabBar(
-                    indicatorColor: green,
-                    labelColor: green,
-                    unselectedLabelColor: muted,
-                    tabs: [
-                      Tab(text: 'Ledger Entries'),
-                      Tab(text: 'Summary'),
-                    ],
-                  ),
-
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        entries.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'No ledger entries yet.',
-                                  style: TextStyle(color: muted),
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.all(12),
-                                itemCount: entries.length,
-                                itemBuilder: (context, index) {
-                                  final entry =
-                                      entries[entries.length - 1 - index];
-
-                                  final transaction =
-                                      _transactions.firstWhere(
-                                    (item) =>
-                                        item.id == entry.transactionId,
-                                    orElse: () => JournalTransaction(
-                                      id: '',
-                                      voucherNumber: '',
-                                      title: 'Unknown Transaction',
-                                      date: entry.createdAt,
-                                      createdAt: entry.createdAt,
-                                      entries: const [],
-                                    ),
-                                  );
-
-                                  final isDebit =
-                                      entry.side == EntrySide.debit;
-
-                                  return Container(
-                                    margin: const EdgeInsets.only(
-                                      bottom: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: surface,
-                                      borderRadius:
-                                          BorderRadius.circular(12),
-                                      border: Border.all(color: border),
-                                    ),
-                                    child: ListTile(
-                                      leading: Container(
-                                        width: 43,
-                                        height: 43,
-                                        decoration: BoxDecoration(
-                                          color: background,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          '${transaction.date.day}\n'
-                                          '${_monthName(transaction.date.month)}',
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      title: Text(
-                                        transaction.title,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        transaction.voucherNumber,
-                                        style: const TextStyle(
-                                          color: muted,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                      trailing: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            isDebit ? 'Debit' : 'Credit',
-                                            style: const TextStyle(
-                                              color: muted,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                          Text(
-                                            _formatAmount(entry.amount),
-                                            style: TextStyle(
-                                              color: isDebit
-                                                  ? green
-                                                  : const Color(0xFFFF647C),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                        Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Column(
-                            children: [
-                              _summaryRow(
-                                'Account Name',
-                                account.name,
-                              ),
-                              _summaryRow(
-                                'Account Type',
-                                _typeName(account.type),
-                              ),
-                              _summaryRow(
-                                'Opening Balance',
-                                _formatAmount(account.openingBalance),
-                              ),
-                              _summaryRow(
-                                'Total Debit',
-                                _formatAmount(debitTotal),
-                              ),
-                              _summaryRow(
-                                'Total Credit',
-                                _formatAmount(creditTotal),
-                              ),
-                              const Divider(color: border),
-                              _summaryRow(
-                                'Current Balance',
-                                _formatAmount(_balance(account)),
-                                highlight: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _detailAmount(String title, String amount) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: muted,
-              fontSize: 10,
-            ),
-          ),
-          const SizedBox(height: 5),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              amount,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
+  // Opens the full-screen Account Details page.
+  Future<void> _viewAccount(LedgerAccount account) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AccountDetailsScreen(
+          account: account,
+          transactions: _transactions,
+        ),
       ),
     );
-  }
-
-  Widget _summaryRow(
-    String title,
-    String value, {
-    bool highlight = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(color: muted),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                color: highlight ? green : Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _monthName(int month) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return months[month - 1];
   }
 
   Widget _buildFilter(String filter) {
@@ -894,7 +544,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
         actions: [
           IconButton(
             onPressed: () => _showAccountForm(),
-            icon: const Icon(Icons.add, color: green, size: 27),
+            icon: const Icon(
+              Icons.add,
+              color: green,
+              size: 27,
+            ),
             tooltip: 'Add Account',
           ),
           const SizedBox(width: 5),
@@ -929,7 +583,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -952,9 +605,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 12),
-
                   if (visibleAccounts.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(28),
