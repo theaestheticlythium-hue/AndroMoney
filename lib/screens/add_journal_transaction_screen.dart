@@ -6,6 +6,8 @@ import '../models/ledger_entry.dart';
 import '../models/journal_transaction.dart';
 import '../services/ledger_service.dart';
 
+enum VoucherType { receipt, payment }
+
 class AddJournalTransactionScreen extends StatefulWidget {
   final List<LedgerAccount> accounts;
   final JournalTransaction? transactionToEdit;
@@ -31,22 +33,42 @@ class _AddJournalTransactionScreenState
 
   final LedgerService _ledgerService = LedgerService();
 
-  String? _debitAccountId;
-  String? _creditAccountId;
-  DateTime _selectedDate = DateTime.now();
+  VoucherType _voucherType = VoucherType.receipt;
 
+  String? _cashAccountId;
+  String? _ledgerAccountId;
+
+  DateTime _selectedDate = DateTime.now();
   bool _isSaving = false;
 
   bool get _isEditing => widget.transactionToEdit != null;
+
+  List<LedgerAccount> get _activeAccounts =>
+      widget.accounts.where((account) => !account.isArchived).toList();
+
+  List<LedgerAccount> get _cashAccounts =>
+      _activeAccounts.where(
+        (account) => account.type == AccountType.asset,
+      ).toList();
+
+  List<LedgerAccount> get _ledgerAccounts =>
+      _activeAccounts.where(
+        (account) =>
+            account.id != _cashAccountId &&
+            account.type != AccountType.asset,
+      ).toList();
 
   @override
   void initState() {
     super.initState();
 
+    _amountController.addListener(_updateAmount);
+
     final transaction = widget.transactionToEdit;
 
     if (transaction != null) {
       _titleController.text = transaction.title;
+      _amountController.text = _getInitialAmount(transaction);
       _notesController.text = transaction.notes ?? '';
       _referenceController.text =
           transaction.referenceNumber ?? '';
@@ -62,16 +84,57 @@ class _AddJournalTransactionScreenState
 
       if (debitEntries.length == 1 &&
           creditEntries.length == 1) {
-        _debitAccountId = debitEntries.first.accountId;
-        _creditAccountId = creditEntries.first.accountId;
-        _amountController.text =
-            debitEntries.first.amount.toStringAsFixed(2);
+        final debitAccount = _findAccount(
+          debitEntries.first.accountId,
+        );
+
+        if (debitAccount?.type == AccountType.asset) {
+          _voucherType = VoucherType.receipt;
+          _cashAccountId = debitEntries.first.accountId;
+          _ledgerAccountId = creditEntries.first.accountId;
+        } else if (_findAccount(
+              creditEntries.first.accountId,
+            )?.type ==
+            AccountType.asset) {
+          _voucherType = VoucherType.payment;
+          _cashAccountId = creditEntries.first.accountId;
+          _ledgerAccountId = debitEntries.first.accountId;
+        }
+      }
+    }
+
+    if (_cashAccountId == null && _cashAccounts.isNotEmpty) {
+      _cashAccountId = _cashAccounts.first.id;
+    }
+
+    if (_ledgerAccountId == null) {
+      final available = _ledgerAccounts;
+      if (available.isNotEmpty) {
+        _ledgerAccountId = available.first.id;
       }
     }
   }
 
+  String _getInitialAmount(JournalTransaction transaction) {
+    if (transaction.entries.isEmpty) return '';
+
+    return transaction.entries.first.amount.toStringAsFixed(2);
+  }
+
+  LedgerAccount? _findAccount(String id) {
+    for (final account in widget.accounts) {
+      if (account.id == id) return account;
+    }
+    return null;
+  }
+
+  void _updateAmount() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _amountController.removeListener(_updateAmount);
     _titleController.dispose();
     _amountController.dispose();
     _notesController.dispose();
@@ -97,23 +160,13 @@ class _AddJournalTransactionScreenState
   Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_debitAccountId == null || _creditAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Select both Debit and Credit accounts'),
-        ),
-      );
+    if (_cashAccountId == null || _ledgerAccountId == null) {
+      _showMessage('Select both accounts');
       return;
     }
 
-    if (_debitAccountId == _creditAccountId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Debit and Credit accounts must be different',
-          ),
-        ),
-      );
+    if (_cashAccountId == _ledgerAccountId) {
+      _showMessage('Select two different accounts');
       return;
     }
 
@@ -135,11 +188,25 @@ class _AddJournalTransactionScreenState
     final transactionId = oldTransaction?.id ??
         now.microsecondsSinceEpoch.toString();
 
+    // Receipt: Cash/Bank/UPI Debit, Ledger Credit.
+    // Payment: Ledger Debit, Cash/Bank/UPI Credit.
+    final debitAccountId =
+        _voucherType == VoucherType.receipt
+            ? _cashAccountId!
+            : _ledgerAccountId!;
+
+    final creditAccountId =
+        _voucherType == VoucherType.receipt
+            ? _ledgerAccountId!
+            : _cashAccountId!;
+
+    final purpose = _titleController.text.trim();
+
     final transaction = JournalTransaction(
       id: transactionId,
       voucherNumber: oldTransaction?.voucherNumber ??
           'JV-$transactionId',
-      title: _titleController.text.trim(),
+      title: purpose,
       referenceNumber: _referenceController.text.trim().isEmpty
           ? null
           : _referenceController.text.trim(),
@@ -152,19 +219,19 @@ class _AddJournalTransactionScreenState
         LedgerEntry(
           id: '${transactionId}_D',
           transactionId: transactionId,
-          accountId: _debitAccountId!,
+          accountId: debitAccountId,
           side: EntrySide.debit,
           amount: amount,
-          description: _titleController.text.trim(),
+          description: purpose,
           createdAt: now,
         ),
         LedgerEntry(
           id: '${transactionId}_C',
           transactionId: transactionId,
-          accountId: _creditAccountId!,
+          accountId: creditAccountId,
           side: EntrySide.credit,
           amount: amount,
-          description: _titleController.text.trim(),
+          description: purpose,
           createdAt: now,
         ),
       ],
@@ -174,12 +241,7 @@ class _AddJournalTransactionScreenState
       setState(() {
         _isSaving = false;
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transaction is not balanced'),
-        ),
-      );
+      _showMessage('Transaction is not balanced');
       return;
     }
 
@@ -188,16 +250,19 @@ class _AddJournalTransactionScreenState
     Navigator.pop(context, transaction);
   }
 
-  Widget _buildAccountDropdown({
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Widget _buildDropdown({
     required String label,
     required String? value,
+    required List<LedgerAccount> accounts,
     required ValueChanged<String?> onChanged,
   }) {
-    final availableAccounts = widget.accounts
-        .where((account) => !account.isArchived)
-        .toList();
-
-    final validValue = availableAccounts.any(
+    final validValue = accounts.any(
       (account) => account.id == value,
     )
         ? value
@@ -208,33 +273,103 @@ class _AddJournalTransactionScreenState
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
-        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.account_balance_wallet),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
-      items: availableAccounts.map((account) {
+      items: accounts.map((account) {
         return DropdownMenuItem<String>(
           value: account.id,
-          child: Text(
-            '${account.name} (${account.type.name})',
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(account.name),
         );
       }).toList(),
       onChanged: onChanged,
-      validator: (value) {
-        if (value == null) {
-          return 'Please select an account';
-        }
-        return null;
+      validator: (value) =>
+          value == null ? 'Please select $label' : null,
+    );
+  }
+
+  Widget _buildVoucherSelector() {
+    return SegmentedButton<VoucherType>(
+      segments: const [
+        ButtonSegment(
+          value: VoucherType.receipt,
+          label: Text('Receipt'),
+          icon: Icon(Icons.arrow_downward),
+        ),
+        ButtonSegment(
+          value: VoucherType.payment,
+          label: Text('Payment'),
+          icon: Icon(Icons.arrow_upward),
+        ),
+      ],
+      selected: {_voucherType},
+      onSelectionChanged: (selection) {
+        setState(() {
+          _voucherType = selection.first;
+        });
       },
+      style: ButtonStyle(
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.black
+              : Colors.white,
+        ),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Color(0xFF00E676)
+              : const Color(0xFF141C24),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTotalAmount() {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF123D2B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF00E676).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'TOTAL AMOUNT',
+            style: TextStyle(
+              color: Color(0xFF9FFFC4),
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '₹${amount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Color(0xFF00E676),
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _isEditing ? 'Edit Transaction' : 'New Transaction',
+          _isEditing ? 'Edit Entry' : 'New Entry',
         ),
       ),
       body: Form(
@@ -242,21 +377,61 @@ class _AddJournalTransactionScreenState
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const Text(
+              'VOUCHER TYPE',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildVoucherSelector(),
+            const SizedBox(height: 24),
+
+            _buildDropdown(
+              label: 'Cash / Bank / UPI Account',
+              value: _cashAccountId,
+              accounts: _cashAccounts,
+              onChanged: (value) {
+                setState(() {
+                  _cashAccountId = value;
+                  if (_ledgerAccountId == value) {
+                    _ledgerAccountId = null;
+                  }
+                });
+              },
+            ),
+            const SizedBox(height: 18),
+
+            _buildDropdown(
+              label: 'Ledger Name',
+              value: _ledgerAccountId,
+              accounts: _ledgerAccounts,
+              onChanged: (value) {
+                setState(() {
+                  _ledgerAccountId = value;
+                });
+              },
+            ),
+            const SizedBox(height: 18),
+
             TextFormField(
               controller: _titleController,
               decoration: const InputDecoration(
-                labelText: 'Transaction Title',
-                hintText: 'Example: Grocery purchase',
+                labelText: 'Purpose',
+                hintText: 'Enter transaction purpose',
+                prefixIcon: Icon(Icons.description_outlined),
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Enter transaction title';
+                  return 'Enter purpose';
                 }
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
             TextFormField(
               controller: _amountController,
@@ -264,47 +439,25 @@ class _AddJournalTransactionScreenState
                 decimal: true,
               ),
               decoration: const InputDecoration(
-                labelText: 'Amount (₹)',
-                border: OutlineInputBorder(),
+                labelText: 'Amount',
                 prefixText: '₹ ',
+                prefixIcon: Icon(Icons.currency_rupee),
+                border: OutlineInputBorder(),
               ),
               validator: (value) {
-                final amount = double.tryParse(
-                  value?.trim() ?? '',
-                );
-
-                if (amount == null ||
-                    !amount.isFinite ||
-                    amount <= 0) {
+                final parsed = double.tryParse(value?.trim() ?? '');
+                if (parsed == null ||
+                    !parsed.isFinite ||
+                    parsed <= 0) {
                   return 'Enter a valid amount';
                 }
-
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
-            _buildAccountDropdown(
-              label: 'Debit Account',
-              value: _debitAccountId,
-              onChanged: (value) {
-                setState(() {
-                  _debitAccountId = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            _buildAccountDropdown(
-              label: 'Credit Account',
-              value: _creditAccountId,
-              onChanged: (value) {
-                setState(() {
-                  _creditAccountId = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
+            _buildTotalAmount(),
+            const SizedBox(height: 18),
 
             OutlinedButton.icon(
               onPressed: _selectDate,
@@ -315,7 +468,7 @@ class _AddJournalTransactionScreenState
                 '${_selectedDate.year}',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
             TextFormField(
               controller: _referenceController,
@@ -324,7 +477,7 @@ class _AddJournalTransactionScreenState
                 border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
             TextFormField(
               controller: _notesController,
@@ -337,7 +490,7 @@ class _AddJournalTransactionScreenState
             const SizedBox(height: 24),
 
             SizedBox(
-              height: 50,
+              height: 54,
               child: ElevatedButton.icon(
                 onPressed: _isSaving ? null : _saveTransaction,
                 icon: const Icon(Icons.save),
@@ -345,8 +498,8 @@ class _AddJournalTransactionScreenState
                   _isSaving
                       ? 'Saving...'
                       : _isEditing
-                          ? 'Update Transaction'
-                          : 'Save Transaction',
+                          ? 'Update Entry'
+                          : 'Save Entry',
                 ),
               ),
             ),
