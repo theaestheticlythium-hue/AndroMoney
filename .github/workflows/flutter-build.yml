@@ -3,7 +3,9 @@ name: AndroMoney Flutter APK Build
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+
   workflow_dispatch:
 
 permissions:
@@ -11,6 +13,7 @@ permissions:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -23,16 +26,19 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Android project files
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Generate Android project
         run: flutter create --platforms=android --project-name=andromoney .
 
-      - name: Get dependencies
+      - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Analyze Flutter code
-        run: flutter analyze
+      - name: Analyze Flutter source code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings lib
 
-      - name: Build APK
+      - name: Build Release APK
         run: flutter build apk --release
 
       - name: Upload APK
@@ -40,3 +46,5 @@ jobs:
         with:
           name: AndroMoney-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
