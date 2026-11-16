@@ -7,6 +7,7 @@ import '../services/ledger_service.dart';
 import '../services/ledger_storage_service.dart';
 import 'accounts_screen.dart';
 import 'add_journal_transaction_screen.dart';
+import 'reports_screen.dart';
 import 'transactions_screen.dart';
 
 class LedgerHomeScreen extends StatefulWidget {
@@ -130,7 +131,6 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     await _loadData();
   }
 
-  // Corrected callback connection for TransactionsScreen.
   Future<void> _openTransactions() async {
     await Navigator.push(
       context,
@@ -144,6 +144,20 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
             );
           },
           onDelete: _deleteTransaction,
+        ),
+      ),
+    );
+
+    await _loadData();
+  }
+
+  Future<void> _openReports() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportsScreen(
+          accounts: _accounts,
+          transactions: _transactions,
         ),
       ),
     );
@@ -704,7 +718,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                       _buildShortcut(
                         icon: Icons.bar_chart_rounded,
                         title: 'Reports',
-                        onTap: () => _showComingSoon('Reports'),
+                        onTap: _openReports,
                       ),
                       const SizedBox(width: 9),
                       _buildShortcut(
