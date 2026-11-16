@@ -8,10 +8,12 @@ import '../services/ledger_service.dart';
 
 class AddJournalTransactionScreen extends StatefulWidget {
   final List<LedgerAccount> accounts;
+  final JournalTransaction? transactionToEdit;
 
   const AddJournalTransactionScreen({
     super.key,
     required this.accounts,
+    this.transactionToEdit,
   });
 
   @override
@@ -34,6 +36,39 @@ class _AddJournalTransactionScreenState
   DateTime _selectedDate = DateTime.now();
 
   bool _isSaving = false;
+
+  bool get _isEditing => widget.transactionToEdit != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final transaction = widget.transactionToEdit;
+
+    if (transaction != null) {
+      _titleController.text = transaction.title;
+      _notesController.text = transaction.notes ?? '';
+      _referenceController.text =
+          transaction.referenceNumber ?? '';
+      _selectedDate = transaction.date;
+
+      final debitEntries = transaction.entries
+          .where((entry) => entry.side == EntrySide.debit)
+          .toList();
+
+      final creditEntries = transaction.entries
+          .where((entry) => entry.side == EntrySide.credit)
+          .toList();
+
+      if (debitEntries.length == 1 &&
+          creditEntries.length == 1) {
+        _debitAccountId = debitEntries.first.accountId;
+        _creditAccountId = creditEntries.first.accountId;
+        _amountController.text =
+            debitEntries.first.amount.toStringAsFixed(2);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -74,13 +109,17 @@ class _AddJournalTransactionScreenState
     if (_debitAccountId == _creditAccountId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debit and Credit accounts must be different'),
+          content: Text(
+            'Debit and Credit accounts must be different',
+          ),
         ),
       );
       return;
     }
 
-    final amount = double.tryParse(_amountController.text.trim());
+    final amount = double.tryParse(
+      _amountController.text.trim(),
+    );
 
     if (amount == null || !amount.isFinite || amount <= 0) {
       return;
@@ -91,11 +130,15 @@ class _AddJournalTransactionScreenState
     });
 
     final now = DateTime.now();
-    final transactionId = now.microsecondsSinceEpoch.toString();
+    final oldTransaction = widget.transactionToEdit;
+
+    final transactionId = oldTransaction?.id ??
+        now.microsecondsSinceEpoch.toString();
 
     final transaction = JournalTransaction(
       id: transactionId,
-      voucherNumber: 'JV-$transactionId',
+      voucherNumber: oldTransaction?.voucherNumber ??
+          'JV-$transactionId',
       title: _titleController.text.trim(),
       referenceNumber: _referenceController.text.trim().isEmpty
           ? null
@@ -104,7 +147,7 @@ class _AddJournalTransactionScreenState
           ? null
           : _notesController.text.trim(),
       date: _selectedDate,
-      createdAt: now,
+      createdAt: oldTransaction?.createdAt ?? now,
       entries: [
         LedgerEntry(
           id: '${transactionId}_D',
@@ -150,16 +193,24 @@ class _AddJournalTransactionScreenState
     required String? value,
     required ValueChanged<String?> onChanged,
   }) {
+    final availableAccounts = widget.accounts
+        .where((account) => !account.isArchived)
+        .toList();
+
+    final validValue = availableAccounts.any(
+      (account) => account.id == value,
+    )
+        ? value
+        : null;
+
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: validValue,
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
       ),
-      items: widget.accounts
-          .where((account) => !account.isArchived)
-          .map((account) {
+      items: availableAccounts.map((account) {
         return DropdownMenuItem<String>(
           value: account.id,
           child: Text(
@@ -170,7 +221,9 @@ class _AddJournalTransactionScreenState
       }).toList(),
       onChanged: onChanged,
       validator: (value) {
-        if (value == null) return 'Please select an account';
+        if (value == null) {
+          return 'Please select an account';
+        }
         return null;
       },
     );
@@ -180,7 +233,9 @@ class _AddJournalTransactionScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Transaction'),
+        title: Text(
+          _isEditing ? 'Edit Transaction' : 'New Transaction',
+        ),
       ),
       body: Form(
         key: _formKey,
@@ -214,9 +269,13 @@ class _AddJournalTransactionScreenState
                 prefixText: '₹ ',
               ),
               validator: (value) {
-                final amount = double.tryParse(value?.trim() ?? '');
+                final amount = double.tryParse(
+                  value?.trim() ?? '',
+                );
 
-                if (amount == null || !amount.isFinite || amount <= 0) {
+                if (amount == null ||
+                    !amount.isFinite ||
+                    amount <= 0) {
                   return 'Enter a valid amount';
                 }
 
@@ -283,7 +342,11 @@ class _AddJournalTransactionScreenState
                 onPressed: _isSaving ? null : _saveTransaction,
                 icon: const Icon(Icons.save),
                 label: Text(
-                  _isSaving ? 'Saving...' : 'Save Transaction',
+                  _isSaving
+                      ? 'Saving...'
+                      : _isEditing
+                          ? 'Update Transaction'
+                          : 'Save Transaction',
                 ),
               ),
             ),
