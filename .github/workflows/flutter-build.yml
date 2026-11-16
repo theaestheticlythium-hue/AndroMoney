@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
@@ -34,6 +33,12 @@ jobs:
 
       - name: Get Flutter dependencies
         run: flutter pub get
+
+      - name: Generate custom app icon
+        run: dart run flutter_launcher_icons
+
+      - name: Generate splash screen
+        run: dart run flutter_native_splash:create
 
       - name: Analyze Flutter source code
         run: flutter analyze --no-fatal-infos --no-fatal-warnings lib
