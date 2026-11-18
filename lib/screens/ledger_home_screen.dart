@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../models/ledger_account.dart';
+import '../models/ledger_entry.dart';
 import '../models/journal_transaction.dart';
 import '../services/ledger_service.dart';
 import '../services/ledger_storage_service.dart';
@@ -530,6 +531,12 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     JournalTransaction transaction,
   ) {
     final receipt = _isReceipt(transaction);
+    final fundTransfer = _isFundTransfer(transaction);
+    final tileColor = receipt
+        ? green
+        : fundTransfer
+            ? const Color(0xFF69F0AE)
+            : Colors.redAccent;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
