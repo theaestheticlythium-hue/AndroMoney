@@ -1,4 +1,6 @@
 
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../models/ledger_account.dart';
@@ -388,6 +390,76 @@ class _AccountsScreenState extends State<AccountsScreen> {
     );
   }
 
+  Widget _liquidBackground() {
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF080D12), Color(0xFF101B24), Color(0xFF080D12)],
+              ),
+            ),
+          ),
+          _glowOrb(const Color(0xFF00E676), const Alignment(-1.1, -0.85), 230),
+          _glowOrb(const Color(0xFF168B9A), const Alignment(1.0, 0.15), 210),
+          _glowOrb(const Color(0xFF64748B), const Alignment(-0.3, 1.0), 190),
+        ],
+      ),
+    );
+  }
+
+  Widget _glowOrb(Color color, Alignment alignment, double size) {
+    return Align(
+      alignment: alignment,
+      child: ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(sigmaX: 75, sigmaY: 75),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.13),
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _glassSurface({required Widget child, EdgeInsets padding = EdgeInsets.zero}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.13),
+                Colors.white.withValues(alpha: 0.045),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.20),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilter(String filter) {
     final selected = _selectedFilter == filter;
 
@@ -405,10 +477,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
           vertical: 10,
         ),
         decoration: BoxDecoration(
-          color: selected ? green : surface,
+          color: selected ? green : Colors.white.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(25),
           border: Border.all(
-            color: selected ? green : border,
+            color: selected ? green : Colors.white.withValues(alpha: 0.13),
           ),
         ),
         child: Text(
@@ -426,14 +498,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
   Widget _buildAccountCard(LedgerAccount account) {
     final color = _accountColor(account.type);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: ListTile(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: _glassSurface(
+        child: ListTile(
         onTap: () => _viewAccount(account),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -525,6 +593,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -535,7 +604,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
     return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         title: const Text(
           'Manage Accounts',
@@ -564,76 +633,64 @@ class _AccountsScreenState extends State<AccountsScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: green),
-            )
-          : RefreshIndicator(
-              color: green,
-              backgroundColor: surface,
-              onRefresh: _loadData,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
-                children: [
-                  SizedBox(
-                    height: 43,
+      body: Stack(
+        children: [
+          _liquidBackground(),
+          SafeArea(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: green))
+                : RefreshIndicator(
+                    color: green,
+                    backgroundColor: surface,
+                    onRefresh: _loadData,
                     child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: _filters.map(_buildFilter).toList(),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
+                      children: [
+                        SizedBox(
+                          height: 43,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: _filters.map(_buildFilter).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${visibleAccounts.length} Accounts',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              _selectedFilter == 'All' ? 'All Accounts' : _selectedFilter,
+                              style: const TextStyle(color: green, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (visibleAccounts.isEmpty)
+                          _glassSurface(
+                            padding: const EdgeInsets.all(28),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.account_balance_wallet_outlined, size: 38, color: muted),
+                                SizedBox(height: 12),
+                                Text('No accounts found', style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
+                          )
+                        else
+                          ...visibleAccounts.map(_buildAccountCard),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${visibleAccounts.length} Accounts',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        _selectedFilter == 'All'
-                            ? 'All Accounts'
-                            : _selectedFilter,
-                        style: const TextStyle(
-                          color: green,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (visibleAccounts.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        color: surface,
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: border),
-                      ),
-                      child: const Column(
-                        children: [
-                          Icon(
-                            Icons.account_balance_wallet_outlined,
-                            size: 38,
-                            color: muted,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            'No accounts found',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    ...visibleAccounts.map(_buildAccountCard),
-                ],
-              ),
-            ),
+          ),
+        ],
+      ),
     );
   }
 }

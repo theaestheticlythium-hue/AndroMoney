@@ -1,6 +1,9 @@
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+import '../theme/glass_widgets.dart';
+
 import '../models/ledger_account.dart';
 import '../models/ledger_entry.dart';
 import '../models/journal_transaction.dart';
@@ -27,11 +30,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   final LedgerService _ledgerService = LedgerService();
 
-  static const Color background = Color(0xFF080D12);
-  static const Color surface = Color(0xFF111B22);
-  static const Color green = Color(0xFF00E676);
-  static const Color muted = Color(0xFF9AA7B0);
-  static const Color border = Color(0xFF263640);
+  static const Color background = AppTheme.background;
+  static const Color surface = AppTheme.surface;
+  static const Color green = AppTheme.primary;
+  static const Color muted = AppTheme.muted;
+  static const Color border = AppTheme.border;
 
   @override
   void initState() {
@@ -129,27 +132,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   }
 
   Widget _buildBalanceCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        vertical: 22,
-        horizontal: 16,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(
-          color: green.withValues(alpha: 0.35),
-        ),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            green.withValues(alpha: 0.19),
-            const Color(0xFF09251C),
-            surface,
-          ],
-        ),
-      ),
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+      tint: green,
       child: Column(
         children: [
           const Text(
@@ -273,14 +258,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
         final isDebit = entry.side == EntrySide.debit;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 9),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: border),
-          ),
-          child: ListTile(
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 9),
+          child: GlassCard(
+            padding: EdgeInsets.zero,
+            radius: 16,
+            child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 11,
               vertical: 4,
@@ -346,6 +329,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
               ],
             ),
           ),
+          ),
         );
       },
     );
@@ -355,6 +339,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     return ListView(
       padding: const EdgeInsets.all(18),
       children: [
+        GlassCard(
+          child: Column(
+            children: [
         _summaryRow('Account Name', widget.account.name),
         _summaryRow('Account Type', _typeName(widget.account.type)),
         _summaryRow(
@@ -378,6 +365,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         _summaryRow(
           'Total Ledger Entries',
           _entries.length.toString(),
+        ),
+            ],
+          ),
         ),
       ],
     );
@@ -424,18 +414,21 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     final color = _accountColor(widget.account.type);
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,
         title: Text(
           widget.account.name,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
+      body: LiquidGlassBackground(
+        safeArea: false,
+        child: SafeArea(
+          child: Column(
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Column(
@@ -506,7 +499,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

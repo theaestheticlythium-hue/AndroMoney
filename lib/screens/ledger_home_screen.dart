@@ -12,6 +12,7 @@ import 'add_journal_transaction_screen.dart';
 import 'reports_screen.dart';
 import 'settings_screen.dart';
 import 'transactions_screen.dart';
+import 'fund_transfer_screen.dart';
 
 class LedgerHomeScreen extends StatefulWidget {
   const LedgerHomeScreen({super.key});
@@ -120,6 +121,38 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
               : 'Transaction saved successfully',
         ),
       ),
+    );
+  }
+
+
+  Future<void> _openFundTransfer() async {
+    final result = await Navigator.push<JournalTransaction>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FundTransferScreen(accounts: _accounts),
+      ),
+    );
+
+    if (result == null) return;
+
+    if (!_ledgerService.validateTransaction(result)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid or unbalanced transfer')),
+      );
+      return;
+    }
+
+    final updatedTransactions = [..._transactions, result];
+    await _storage.saveTransactions(updatedTransactions);
+
+    if (!mounted) return;
+    setState(() {
+      _transactions = updatedTransactions;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fund transfer saved successfully')),
     );
   }
 
@@ -454,17 +487,43 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
   }
 
   bool _isReceipt(JournalTransaction transaction) {
-    final debitEntries = transaction.entries.where(
-      (entry) => entry.side.name == 'debit',
-    );
-
-    return debitEntries.any((entry) {
-      return _accounts.any(
-        (account) =>
-            account.id == entry.accountId &&
-            account.type == AccountType.asset,
-      );
+    final hasAssetDebit = transaction.entries.any((entry) {
+      return entry.side == EntrySide.debit &&
+          _accounts.any(
+            (account) =>
+                account.id == entry.accountId &&
+                account.type == AccountType.asset,
+          );
     });
+    final hasIncomeCredit = transaction.entries.any((entry) {
+      return entry.side == EntrySide.credit &&
+          _accounts.any(
+            (account) =>
+                account.id == entry.accountId &&
+                account.type == AccountType.income,
+          );
+    });
+    return hasAssetDebit && hasIncomeCredit;
+  }
+
+  bool _isFundTransfer(JournalTransaction transaction) {
+    final hasAssetDebit = transaction.entries.any((entry) {
+      return entry.side == EntrySide.debit &&
+          _accounts.any(
+            (account) =>
+                account.id == entry.accountId &&
+                account.type == AccountType.asset,
+          );
+    });
+    final hasAssetCredit = transaction.entries.any((entry) {
+      return entry.side == EntrySide.credit &&
+          _accounts.any(
+            (account) =>
+                account.id == entry.accountId &&
+                account.type == AccountType.asset,
+          );
+    });
+    return hasAssetDebit && hasAssetCredit;
   }
 
   Widget _buildTransactionTile(
@@ -484,14 +543,14 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
         ),
         leading: CircleAvatar(
           radius: 22,
-          backgroundColor: receipt
-              ? green.withValues(alpha: 0.16)
-              : Colors.redAccent.withValues(alpha: 0.14),
+          backgroundColor: tileColor.withValues(alpha: 0.16),
           child: Icon(
             receipt
-                ? Icons.shopping_cart_outlined
-                : Icons.receipt_long,
-            color: receipt ? green : Colors.redAccent,
+                ? Icons.south_west_rounded
+                : fundTransfer
+                    ? Icons.swap_horiz_rounded
+                    : Icons.north_east_rounded,
+            color: tileColor,
             size: 23,
           ),
         ),
@@ -814,6 +873,23 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                         title: 'Settings',
                         onTap: _openSettings,
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      _buildShortcut(
+                        icon: Icons.swap_horiz_rounded,
+                        title: 'Fund Transfer',
+                        onTap: _openFundTransfer,
+                        color: const Color(0xFF69F0AE),
+                      ),
+                      const SizedBox(width: 9),
+                      const Expanded(child: SizedBox(height: 68)),
+                      const SizedBox(width: 9),
+                      const Expanded(child: SizedBox(height: 68)),
+                      const SizedBox(width: 9),
+                      const Expanded(child: SizedBox(height: 68)),
                     ],
                   ),
                   const SizedBox(height: 26),

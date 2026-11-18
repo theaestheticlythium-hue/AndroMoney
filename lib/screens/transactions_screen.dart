@@ -1,6 +1,9 @@
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+import '../theme/glass_widgets.dart';
+
 import '../models/ledger_account.dart';
 import '../models/ledger_entry.dart';
 import '../models/journal_transaction.dart';
@@ -25,11 +28,11 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
-  static const Color background = Color(0xFF080D12);
-  static const Color surface = Color(0xFF111B22);
-  static const Color green = Color(0xFF00E676);
-  static const Color muted = Color(0xFF9AA7B0);
-  static const Color border = Color(0xFF263640);
+  static const Color background = AppTheme.background;
+  static const Color surface = AppTheme.surface;
+  static const Color green = AppTheme.primary;
+  static const Color muted = AppTheme.muted;
+  static const Color border = AppTheme.border;
   static const Color red = Color(0xFFFF647C);
 
   final TextEditingController _searchController =
@@ -421,14 +424,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     final type = _transactionType(transaction);
     final color = _typeColor(type);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 9),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: ListTile(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: GlassCard(
+        padding: EdgeInsets.zero,
+        radius: 16,
+        child: ListTile(
         onTap: () => _showTransactionDetails(transaction),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 11,
@@ -554,6 +555,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -600,20 +602,26 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     final transactions = _filteredTransactions;
 
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,
         title: const Text(
           'Transactions',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: Column(
-        children: [
+      body: LiquidGlassBackground(
+        safeArea: false,
+        child: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-            child: TextField(
+            child: GlassCard(
+              padding: EdgeInsets.zero,
+              radius: 15,
+              child: TextField(
               controller: _searchController,
               style: const TextStyle(color: Colors.white),
               onChanged: (value) {
@@ -656,6 +664,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   borderRadius: BorderRadius.circular(13),
                   borderSide: const BorderSide(color: green),
                 ),
+              ),
               ),
             ),
           ),
@@ -738,7 +747,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     },
                   ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

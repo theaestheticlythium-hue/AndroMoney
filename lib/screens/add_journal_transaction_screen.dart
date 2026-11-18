@@ -1,6 +1,9 @@
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+import '../theme/glass_widgets.dart';
+
 import '../models/ledger_account.dart';
 import '../models/ledger_entry.dart';
 import '../models/journal_transaction.dart';
@@ -35,6 +38,9 @@ class _AddJournalTransactionScreenState
 
   VoucherType _voucherType = VoucherType.receipt;
 
+  static const Color _green = AppTheme.primary;
+  static const Color _muted = AppTheme.muted;
+
   String? _cashAccountId;
   String? _ledgerAccountId;
 
@@ -51,12 +57,23 @@ class _AddJournalTransactionScreenState
         (account) => account.type == AccountType.asset,
       ).toList();
 
-  List<LedgerAccount> get _ledgerAccounts =>
-      _activeAccounts.where(
-        (account) =>
-            account.id != _cashAccountId &&
-            account.type != AccountType.asset,
-      ).toList();
+  List<LedgerAccount> get _ledgerAccounts {
+    final requiredType = _voucherType == VoucherType.receipt
+        ? AccountType.income
+        : AccountType.expense;
+
+    return _activeAccounts
+        .where((account) => account.type == requiredType)
+        .toList();
+  }
+
+  void _selectDefaultCategoryAccount() {
+    if (_ledgerAccounts.any((account) => account.id == _ledgerAccountId)) {
+      return;
+    }
+    _ledgerAccountId =
+        _ledgerAccounts.isNotEmpty ? _ledgerAccounts.first.id : null;
+  }
 
   @override
   void initState() {
@@ -101,6 +118,7 @@ class _AddJournalTransactionScreenState
           _ledgerAccountId = debitEntries.first.accountId;
         }
       }
+      _selectDefaultCategoryAccount();
     }
 
     if (_cashAccountId == null && _cashAccounts.isNotEmpty) {
@@ -108,10 +126,7 @@ class _AddJournalTransactionScreenState
     }
 
     if (_ledgerAccountId == null) {
-      final available = _ledgerAccounts;
-      if (available.isNotEmpty) {
-        _ledgerAccountId = available.first.id;
-      }
+      _selectDefaultCategoryAccount();
     }
   }
 
@@ -161,7 +176,7 @@ class _AddJournalTransactionScreenState
     if (!_formKey.currentState!.validate()) return;
 
     if (_cashAccountId == null || _ledgerAccountId == null) {
-      _showMessage('Select both accounts');
+      _showMessage('Please select a Cash / Bank / UPI account and ensure an Income / Expense category account exists.');
       return;
     }
 
@@ -275,7 +290,7 @@ class _AddJournalTransactionScreenState
         labelText: label,
         prefixIcon: const Icon(Icons.account_balance_wallet),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
       items: accounts.map((account) {
@@ -308,6 +323,7 @@ class _AddJournalTransactionScreenState
       onSelectionChanged: (selection) {
         setState(() {
           _voucherType = selection.first;
+          _selectDefaultCategoryAccount();
         });
       },
       style: ButtonStyle(
@@ -318,8 +334,8 @@ class _AddJournalTransactionScreenState
         ),
         backgroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? const Color(0xFF00E676)
-              : const Color(0xFF141C24),
+              ? _green
+              : AppTheme.surface,
         ),
       ),
     );
@@ -328,15 +344,9 @@ class _AddJournalTransactionScreenState
   Widget _buildTotalAmount() {
     final amount = double.tryParse(_amountController.text) ?? 0;
 
-    return Container(
+    return GlassCard(
+      tint: _green,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF123D2B),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFF00E676).withValues(alpha: 0.3),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -372,11 +382,18 @@ class _AddJournalTransactionScreenState
           _isEditing ? 'Edit Entry' : 'New Entry',
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
+      backgroundColor: Colors.transparent,
+      body: LiquidGlassBackground(
+        safeArea: false,
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
             const Text(
               'VOUCHER TYPE',
               style: TextStyle(
@@ -399,18 +416,6 @@ class _AddJournalTransactionScreenState
                   if (_ledgerAccountId == value) {
                     _ledgerAccountId = null;
                   }
-                });
-              },
-            ),
-            const SizedBox(height: 18),
-
-            _buildDropdown(
-              label: 'Ledger Name',
-              value: _ledgerAccountId,
-              accounts: _ledgerAccounts,
-              onChanged: (value) {
-                setState(() {
-                  _ledgerAccountId = value;
                 });
               },
             ),
@@ -503,7 +508,11 @@ class _AddJournalTransactionScreenState
                 ),
               ),
             ),
-          ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
