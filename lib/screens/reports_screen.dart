@@ -1,5 +1,7 @@
 
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -121,19 +123,95 @@ class ReportsScreen extends StatelessWidget {
     return total;
   }
 
+  Widget _glassPanel({
+    required Widget child,
+    EdgeInsets padding = const EdgeInsets.all(16),
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.13),
+                Colors.white.withOpacity(0.045),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.16),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.22),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _liquidBackground() {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Stack(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF080D14), Color(0xFF101A24), Color(0xFF080D12)],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 30,
+              right: -90,
+              child: _glowOrb(const Color(0xFF00E676), 230),
+            ),
+            Positioned(
+              top: 390,
+              left: -110,
+              child: _glowOrb(const Color(0xFF26C6DA), 250),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _glowOrb(Color color, double size) {
+    return ImageFiltered(
+      imageFilter: ui.ImageFilter.blur(sigmaX: 75, sigmaY: 75),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.22),
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+
   Widget _summaryCard({
     required String title,
     required String amount,
     required Color color,
     required IconData icon,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
+    return _glassPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -222,12 +300,8 @@ class ReportsScreen extends StatelessWidget {
       },
     );
 
-    return Container(
+    return _glassPanel(
       padding: const EdgeInsets.fromLTRB(12, 20, 16, 12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
       child: Column(
         children: [
           Row(
@@ -347,12 +421,7 @@ class ReportsScreen extends StatelessWidget {
     final sortedEntries = breakdown.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return _glassPanel(
       child: Column(
         children: sortedEntries.map((entry) {
           final percentage = total == 0 ? 0.0 : entry.value / total;
@@ -412,14 +481,11 @@ class ReportsScreen extends StatelessWidget {
   }
 
   Widget _emptyMessage(String message) {
-    return Container(
-      width: double.infinity,
+    return _glassPanel(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
+      child: SizedBox(
+        width: double.infinity,
+        child: Text(
         message,
         textAlign: TextAlign.center,
         style: const TextStyle(
@@ -427,7 +493,7 @@ class ReportsScreen extends StatelessWidget {
           fontSize: 13,
         ),
       ),
-    );
+    ));
   }
 
   @override
@@ -439,7 +505,7 @@ class ReportsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: backgroundColor,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -447,10 +513,14 @@ class ReportsScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          _liquidBackground(),
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
             const Text(
               'Financial Overview',
               style: TextStyle(
@@ -497,8 +567,10 @@ class ReportsScreen extends StatelessWidget {
             _sectionTitle('Expense by Category'),
             _expenseBreakdownSection(),
             const SizedBox(height: 24),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
