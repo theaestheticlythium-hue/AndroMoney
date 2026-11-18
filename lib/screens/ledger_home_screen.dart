@@ -1,4 +1,6 @@
 
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../models/ledger_account.dart';
@@ -27,11 +29,11 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
 
   bool _isLoading = true;
 
-  static const Color background = Color(0xFF080D12);
-  static const Color surface = Color(0xFF111B22);
+  static const Color background = Color(0xFF070B12);
+  static const Color surface = Color(0xFF18232E);
   static const Color green = Color(0xFF00E676);
   static const Color muted = Color(0xFF9AA7B0);
-  static const Color border = Color(0xFF263640);
+  static const Color border = Color(0x66D9F2FF);
 
   @override
   void initState() {
@@ -374,37 +376,23 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     required Color accent,
   }) {
     return Expanded(
-      child: Container(
+      child: _glassSurface(
+        radius: BorderRadius.circular(20),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: accent.withValues(alpha: 0.45),
-          ),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              accent.withValues(alpha: 0.19),
-              surface,
-            ],
-          ),
-        ),
+        tint: accent.withValues(alpha: 0.075),
         child: Row(
           children: [
-            Icon(icon, color: accent, size: 29),
+            Icon(icon, color: accent, size: 27),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                    ),
-                  ),
+                  Text(title,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      )),
                   const SizedBox(height: 8),
                   FittedBox(
                     fit: BoxFit.scaleDown,
@@ -436,34 +424,29 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(13),
-        child: Container(
-          height: 94,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 5,
-            vertical: 13,
-          ),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: border),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 29),
-              const SizedBox(height: 9),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  height: 1.2,
+        borderRadius: BorderRadius.circular(17),
+        child: _glassSurface(
+          radius: BorderRadius.circular(17),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 13),
+          child: SizedBox(
+            height: 68,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 26),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    height: 1.2,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -489,14 +472,11 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
   ) {
     final receipt = _isReceipt(transaction);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: ListTile(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _glassSurface(
+        radius: BorderRadius.circular(17),
+        child: ListTile(
         onTap: () => _openTransactionDetails(transaction),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 11,
@@ -585,6 +565,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -596,6 +577,99 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     return months[month - 1];
   }
 
+
+  Widget _liquidBackground() {
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF07111D),
+                  Color(0xFF101C2A),
+                  Color(0xFF080D14),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: -90,
+            left: -70,
+            child: _glowOrb(const Color(0xFF00E676), 230),
+          ),
+          Positioned(
+            top: 260,
+            right: -100,
+            child: _glowOrb(const Color(0xFF3D8BFF), 250),
+          ),
+          Positioned(
+            bottom: -110,
+            left: 35,
+            child: _glowOrb(const Color(0xFF00BFA5), 220),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _glowOrb(Color color, double size) {
+    return ImageFiltered(
+      imageFilter: ui.ImageFilter.blur(sigmaX: 75, sigmaY: 75),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.22),
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+
+  Widget _glassSurface({
+    required Widget child,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    BorderRadius radius = const BorderRadius.all(Radius.circular(22)),
+    Color tint = const Color(0x24FFFFFF),
+  }) {
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: tint,
+            borderRadius: radius,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.19),
+              width: 1,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.13),
+                Colors.white.withValues(alpha: 0.035),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.20),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final recentTransactions = [..._transactions]
@@ -604,7 +678,8 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
     return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         titleSpacing: 12,
         title: Row(
           children: [
@@ -647,7 +722,7 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                   ),
                 ),
                 const Text(
-                  'Double-Entry Accounting',
+                  'Personal Finance',
                   style: TextStyle(
                     color: muted,
                     fontSize: 9,
@@ -680,13 +755,16 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: green),
-            )
-          : RefreshIndicator(
+      body: Stack(
+        children: [
+          _liquidBackground(),
+          _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: green),
+                )
+              : RefreshIndicator(
               color: green,
-              backgroundColor: surface,
+              backgroundColor: const Color(0xFF1B2936),
               onRefresh: _loadData,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -802,6 +880,8 @@ class _LedgerHomeScreenState extends State<LedgerHomeScreen> {
                 ],
               ),
             ),
+        ],
+      ),
     );
   }
 }
